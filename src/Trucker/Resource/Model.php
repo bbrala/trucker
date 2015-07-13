@@ -226,7 +226,7 @@ class Model
      */
     public function getGuardedAttributes()
     {
-        $attrs = array_map('trim', explode(',', $this->guarded));
+        $attrs = array_filter(array_map('trim', explode(',', $this->guarded)));
 
         //the identityProperty should always be guarded
         if (!in_array($this->getIdentityProperty(), $attrs)) {
@@ -501,7 +501,7 @@ class Model
     {
         $cantSet = array_map('trim', explode(',', $this->readOnlyFields));
 
-        return $cantSet;
+        return array_filter($cantSet);
     }
 
     /**
