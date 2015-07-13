@@ -90,6 +90,6 @@ class ConfigManager
      */
     public function get($option, $default = null)
     {
-        return $this->app['config']->get('trucker::'.$option, $default);
+        return $this->app['config']->get('trucker.'.$option, $default);
     }
 }
