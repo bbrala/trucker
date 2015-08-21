@@ -10,7 +10,7 @@
  */
 namespace Trucker\Requests;
 
-use Guzzle\Http\Client;
+use GuzzleHttp\Client;
 use Illuminate\Container\Container;
 use Trucker\Facades\Config;
 use Trucker\Facades\ErrorHandlerFactory;
@@ -35,7 +35,7 @@ class RestRequest implements RequestableInterface
     /**
      * Request client
      *
-     * @var \Guzzle\Http\Client
+     * @var \GuzzleHttp\Client
      */
     protected $client;
 
@@ -43,7 +43,7 @@ class RestRequest implements RequestableInterface
      * Request object managed by this
      * class
      *
-     * @var \Guzzle\Http\Message\Request
+     * @var \GuzzleHttp\Message\Request
      */
     protected $request;
 
@@ -62,7 +62,7 @@ class RestRequest implements RequestableInterface
     /**
      * Getter function to access the HTTP Client
      *
-     * @return \Guzzle\Http\Client
+     * @return \GuzzleHttp\Client
      */
     public function &getClient()
     {
@@ -277,7 +277,7 @@ class RestRequest implements RequestableInterface
     {
         try {
             $response = $this->request->send();
-        } catch (\Guzzle\Http\Exception\BadResponseException $e) {
+        } catch (\GuzzleHttp\Exception\BadResponseException $e) {
             $response = $e->getResponse();
         }
 
