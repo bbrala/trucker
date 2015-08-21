@@ -82,7 +82,9 @@ class RestRequest implements RequestableInterface
      */
     public function createRequest($baseUri, $path, $httpMethod = 'GET', $requestHeaders = array(), $httpMethodParam = null)
     {
-        $this->client->setBaseUrl($baseUri);
+
+        $this->client->setDefaultOption('base_url', $baseUri);
+        //$this->client->setBaseUrl($baseUri);
 
         if (!in_array(strtolower($httpMethod), array('get', 'put', 'post', 'patch', 'delete', 'head'))) {
             throw new Exception("Invalid HTTP method");
