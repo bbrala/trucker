@@ -27,7 +27,7 @@ class Response extends BaseResponse
      * Response object managed by this
      * class
      *
-     * @var \Guzzle\Http\Message\Response
+     * @var \GuzzleHttp\Message\Response
      */
     protected $response;
 
@@ -37,7 +37,7 @@ class Response extends BaseResponse
      * @param Container $app
      * @param Client    $client
      */
-    public function __construct(Container $app, \Guzzle\Http\Message\Response $response = null)
+    public function __construct(Container $app, \GuzzleHttp\Message\Response $response = null)
     {
         $this->app = $app;
 
@@ -82,17 +82,17 @@ class Response extends BaseResponse
      * Create a new instance of the given model.
      *
      * @param  Container $app
-     * @param  \Guzzle\Http\Message\Response $response
+     * @param  \GuzzleHttp\Message\Response $response
      * @return \Trucker\Responses\Response
      */
-    public function newInstance(Container $app, \Guzzle\Http\Message\Response $response)
+    public function newInstance(Container $app, \GuzzleHttp\Message\Response $response)
     {
-    
+
         // This method just provides a convenient way for us to generate fresh model
         // instances of this current model. It is particularly useful during the
         // hydration of new objects via the Eloquent query builder instances.
         $r = new static($app, $response);
-    
+
         return $r;
     }
 
@@ -120,7 +120,7 @@ class Response extends BaseResponse
     public function parseResponseStringToObject()
     {
         $transporter = TransporterFactory::build();
-        
+
         return $transporter->parseResponseStringToObject($this->response);
     }
 }

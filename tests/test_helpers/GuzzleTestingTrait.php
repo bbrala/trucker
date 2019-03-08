@@ -41,7 +41,7 @@ trait GuzzleTestingTrait
     {
         $mock = new \Guzzle\Plugin\Mock\MockPlugin();
         $mock->addResponse(
-            new \Guzzle\Http\Message\Response(
+            new \GuzzleHttp\Message\Response(
                 $http_status,
                 $headers,
                 $body
@@ -66,7 +66,7 @@ trait GuzzleTestingTrait
      * the Request class and guzzle
      *
      * @param  array  $config config overrides
-     * @return Guzzle\Http\Client
+     * @return GuzzleHttp\Client
      */
     protected function &initGuzzleRequestTest($config = [])
     {
