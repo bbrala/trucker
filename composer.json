@@ -34,7 +34,7 @@
         "illuminate/container": "^5.0",
         "doctrine/inflector": "^1.1",
         "patchwork/utf8": "1.1.*",
-        "guzzlehttp/guzzle": "^6.0",
+        "guzzlehttp/guzzle": "^5.0",
         "laravel/framework": "5.5.*"
     },
     "require-dev": {
