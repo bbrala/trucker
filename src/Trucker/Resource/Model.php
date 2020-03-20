@@ -16,11 +16,12 @@ use Trucker\Facades\Config;
 use Trucker\Facades\ErrorHandlerFactory;
 use Trucker\Facades\Instance;
 use Trucker\Facades\RequestFactory;
-use Trucker\Facades\Response;
 use Trucker\Facades\ResponseInterpreterFactory;
 use Trucker\Facades\UrlGenerator;
 use Trucker\Finders\Conditions\QueryConditionInterface;
 use Trucker\Finders\Conditions\QueryResultOrderInterface;
+use Doctrine\Common\Inflector\Inflector;
+
 
 /**
  * Base class for interacting with a remote API.
@@ -29,31 +30,6 @@ use Trucker\Finders\Conditions\QueryResultOrderInterface;
  */
 class Model
 {
-    /**
-     * The IoC Container
-     *
-     * @var Container
-     */
-    protected $app;
-
-    /**
-     * The name of the resource which is used to determine
-     * the resource URI through the use of reflection.  By default
-     * if this is not set the class name will be used.
-     *
-     * @var string
-     */
-    protected $resourceName;
-
-    /**
-     * Property to overwrite the getURI()
-     * function with a static value of what remote API URI path
-     * to hit
-     *
-     * @var string
-     */
-    protected $uri;
-
     /**
      * Property to hold the data about entities for which this
      * resource is nested beneath.  For example if this entity was
@@ -86,7 +62,40 @@ class Model
     public $nestedUnder;
 
     /**
+     * The IoC Container
+     *
+     * @var Container
+     */
+    protected $app;
+
+    /**
+     * The name of the resource which is used to determine
+     * the resource URI through the use of reflection.  By default
+     * if this is not set the class name will be used.
+     *
+     * @var string
+     */
+    protected $resourceName;
+
+    /**
+     * Property to overwrite the getURI()
+     * function with a static value of what remote API URI path
+     * to hit
+     *
+     * @var string
+     */
+    protected $uri;
+
+    /**
+     * The pluralized version of the resource name, ie a Page Model would become 'pages'
+     *
+     * @var string
+     */
+    protected $pluralized;
+
+    /**
      * Array of instance values
+     *
      * @var array
      */
     protected $properties = [];
@@ -155,6 +164,14 @@ class Model
      * @var string
      */
     protected $base64Indicator;
+
+    /**
+     * Array of files that were temporarily written for a request
+     * that should be removed after the request is done.
+     *
+     * @var array
+     */
+    private $postRequestCleanUp = array();
 
     /**
      * Constructor used to popuplate the instance with
@@ -261,7 +278,8 @@ class Model
      * Function to fill an instance's properties from an
      * array of keys and values
      *
-     * @param  array  $attributes   Associative array of properties and values
+     * @param  array $attributes Associative array of properties and values
+     *
      * @return void
      */
     public function fill($attributes = [])
@@ -300,7 +318,7 @@ class Model
      */
     public function getGuardedAttributes()
     {
-        $attrs = array_map('trim', explode(',', $this->guarded));
+        $attrs = array_filter(array_map('trim', explode(',', $this->guarded)));
 
         //the identityProperty should always be guarded
         if (!in_array($this->getIdentityProperty(), $attrs)) {
@@ -309,6 +327,16 @@ class Model
 
         return $attrs;
     }
+
+        /**
+     * Getter function to return the identity property
+     *
+     * @return string
+     */
+    public function getIdentityProperty()
+    {
+        return $this->identityProperty ?: Config::get('resource.identity_property');
+    } //end __set
 
     /**
      * Function to return an array of properties that will
@@ -319,16 +347,28 @@ class Model
     public function getFileFields()
     {
         $attrs = array_map('trim', explode(',', $this->fileFields));
+
         return array_filter($attrs);
     }
 
-    /**
+        /**
+     * Getter function to return base64 param indicator
+     *
+     * @return string
+     */
+    public function getBase64Indicator()
+    {
+        return $this->base64Indicator ?: Config::get('resource.base_64_property_indication');
+    } //end __unset
+
+/**
      * Function to take base64 encoded image and write it to a
      * temp file, then add that file to the property list to get
      * added to a request.
      *
      * @param  string $property Entity attribute
      * @param  string $value    Base64 encoded string
+     *
      * @return void
      */
     protected function handleBase64File($property, $value)
@@ -350,31 +390,6 @@ class Model
     } //end handleBase64File
 
     /**
-     * Function to get the instance ID, returns false if there
-     * is not one
-     *
-     * @return instanceId | false
-     */
-    public function getId()
-    {
-        if (array_key_exists($this->getIdentityProperty(), $this->properties)) {
-            return $this->properties[$this->getIdentityProperty()];
-        }
-
-        return false;
-    }
-
-    /**
-     * Getter function to return the identity property
-     *
-     * @return string
-     */
-    public function getIdentityProperty()
-    {
-        return $this->identityProperty ?: Config::get('resource.identity_property');
-    }
-
-    /**
      * Getter function to return the scratch disk location
      *
      * @return string
@@ -385,25 +400,165 @@ class Model
     }
 
     /**
-     * Getter function to return base64 param indicator
+     * Function to find an instance of an Entity record
      *
-     * @return string
+     * @param  int                    $id        The primary identifier value for the record
+     * @param  array                  $getParams Array of GET parameters to pass
+     * @param  Trucker\Resource\Model $instance  An instance to use for interpreting url values
+     *
+     * @return Trucker\Resource\Model              An instance of the entity requested
      */
-    public function getBase64Indicator()
+    public static function find($id, $getParams = [], Model $instance = null)
     {
-        return $this->base64Indicator ?: Config::get('resource.base_64_property_indication');
+        $m = $instance ?: new static;
+
+        return Instance::fetch($m, $id, $getParams);
     }
 
     /**
-     * Function to return an array of property names
-     * that are read only
+     * Function to find a collection of Entity records from the remote api
+     *
+     * @param  QueryConditionInterface   $condition   query conditions
+     * @param  QueryResultOrderInterface $resultOrder result ordering info
+     * @param  array                     $getParams   additional GET params
+     *
+     * @return Trucker\Responses\Collection
+     */
+    public static function all(
+        QueryConditionInterface $condition = null,
+        QueryResultOrderInterface $resultOrder = null,
+        array $getParams = []
+    ) {
+        return Collection::fetch(new static, $condition, $resultOrder, $getParams);
+    }
+
+    /**
+     * Create a new instance of the given model.
+     *
+     * @param  array $attributes
+     *
+     * @return \Trucker\Resource\Model
+     */
+    public function newInstance($attributes = [])
+    {
+        // This method just provides a convenient way for us to generate fresh model
+        // instances of this current model. It is particularly useful during the
+        // hydration of new objects.
+        $model = new static;
+
+        $model->fill((array)$attributes);
+
+        return $model;
+    }
+
+        /**
+     * Magic getter function for accessing instance properties
+     *
+     * @param  string $key Property name
+     *
+     * @return any          The value stored in the property
+     */
+    public function __get($key)
+    {
+        if (array_key_exists($key, $this->properties)) {
+            return $this->properties[$key];
+        }
+
+        return null;
+    } //end handleBase64File
+
+/**
+     * Magic setter function for setting instance properties
+     *
+     * @param   string $property Property name
+     * @param   any    $value    The value to store for the property
+     *
+     * @return  void
+     */
+    public function __set($property, $value)
+    {
+        //if property contains '_base64'
+        if (!(stripos($property, $this->getBase64Indicator()) === false)) {
+
+            //if the property IS a file field
+            $fileProperty = str_replace($this->getBase64Indicator(), '', $property);
+            if (in_array($fileProperty, $this->getFileFields())) {
+                $this->handleBase64File($fileProperty, $value);
+            } //end if file field
+
+        } else {
+
+            $this->properties[$property] = $value;
+        }
+    }
+
+    public function pluralize()
+    {
+        if (!isset($this->pluralized)) {
+            $this->pluralized = Inflector::pluralize(
+                Inflector::tableize(
+                    $this->getResourceName()
+                )
+            );
+        }
+
+        return $this->pluralized;
+    }
+
+    /**
+     * Function to interpret the URI resource name based on the class called.
+     * Generally this would be the name of the class.
+     *
+     * @return string   The sub name of the resource
+     */
+    public function getResourceName()
+    {
+        if (isset($this->resourceName)) {
+            return $this->resourceName;
+        }
+
+        $full_class_arr = explode("\\", get_called_class());
+        $klass = end($full_class_arr);
+        $this->resourceName = $klass;
+
+        return $klass;
+    }
+
+/**
+     * Magic unsetter function for unsetting an instance property
+     *
+     * @param string $property Property name
+     *
+     * @return void
+     */
+    public function __unset($property)
+    {
+        if (array_key_exists($property, $this->properties)) {
+            unset($this->properties[$property]);
+        }
+    }
+
+    /**
+     * Getter function to access the
+     * underlying attributes array for the
+     * entity
+     *
+     * @return arrayhttpStatusError
+     */
+    public function attributes()
+    {
+        return $this->properties;
+    }
+
+    /**
+     * Function to return any errors that
+     * may have prevented a save
      *
      * @return array
      */
-    public function getReadOnlyFields()
+    public function errors()
     {
-        $cantSet = array_map('trim', explode(',', $this->readOnlyFields));
-        return $cantSet;
+        return $this->errors;
     }
 
     /**
@@ -429,22 +584,16 @@ class Model
     }
 
     /**
-     * Function to interpret the URI resource name based on the class called.
-     * Generally this would be the name of the class.
+     * Function to return an array of property names
+     * that are read only
      *
-     * @return string   The sub name of the resource
+     * @return array
      */
-    public function getResourceName()
+    public function getReadOnlyFields()
     {
-        if (isset($this->resourceName)) {
-            return $this->resourceName;
-        }
+        $cantSet = array_map('trim', explode(',', $this->readOnlyFields));
 
-        $full_class_arr = explode("\\", get_called_class());
-        $klass = end($full_class_arr);
-        $this->resourceName = $klass;
-
-        return $klass;
+        return array_filter($cantSet);
     }
 
     /**
@@ -514,7 +663,7 @@ class Model
                 Config::get('request.base_uri'),
                 UrlGenerator::getDeleteUri(
                     $this,
-                    [':' . $this->getIdentityProperty() => $this->getId()]
+                    [':'.$this->getIdentityProperty() => $this->getId()]
                 ),
                 'PUT',
                 [], //no extra headers
@@ -556,7 +705,38 @@ class Model
         }
 
         $this->doPostRequestCleanUp();
+
         return true;
+    }
+
+    /**
+     * Function to get the instance ID, returns false if there
+     * is not one
+     *
+     * @return instanceId | false
+     */
+    public function getId()
+    {
+        if (array_key_exists($this->getIdentityProperty(), $this->properties)) {
+            return $this->properties[$this->getIdentityProperty()];
+        }
+
+        return false;
+    }
+
+    /**
+     * Function to clean up any temp files written for a request
+     *
+     * @return void
+     */
+    protected function doPostRequestCleanUp()
+    {
+        while (count($this->postRequestCleanUp) > 0) {
+            $f = array_pop($this->postRequestCleanUp);
+            if (file_exists($f)) {
+                unlink($f);
+            }
+        }
     }
 
     /**
@@ -574,7 +754,7 @@ class Model
             Config::get('request.base_uri'),
             UrlGenerator::getDeleteUri(
                 $this,
-                [':' . $this->getIdentityProperty() => $this->getId()]
+                [':'.$this->getIdentityProperty() => $this->getId()]
             ),
             'DELETE',
             [], //no extra headers
@@ -603,20 +783,5 @@ class Model
         } //end if-else
 
         return false;
-    }
-
-    /**
-     * Function to clean up any temp files written for a request
-     *
-     * @return void
-     */
-    protected function doPostRequestCleanUp()
-    {
-        while (count($this->postRequestCleanUp) > 0) {
-            $f = array_pop($this->postRequestCleanUp);
-            if (file_exists($f)) {
-                unlink($f);
-            }
-        }
     }
 }

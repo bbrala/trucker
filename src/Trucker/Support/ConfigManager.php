@@ -45,11 +45,40 @@ class ConfigManager
      * Setter for the IoC Container
      *
      * @param Container
+     *
      * @return  void
      */
     public function setApp($app)
     {
         $this->app = $app;
+    }
+
+    /**
+     * Set an option to the config file
+     *
+     * @param  string $option
+     * @param  mixed  $value
+     *
+     * @return mixed
+     */
+    public function set($option, $value)
+    {
+        return $this->app['config']->set('trucker.'.$option, $value);
+    }
+
+    /**
+     * Determine if a config option contains a specific
+     *
+     * @param  string $option Config value must be an array
+     * @param  mixed  $value
+     *
+     * @return bool
+     */
+    public function contains($option, $value)
+    {
+        $option = $this->get($option);
+
+        return is_array($option) && in_array($value, $option);
     }
 
     /**
@@ -59,35 +88,8 @@ class ConfigManager
      *
      * @return mixed
      */
-    public function get($option)
+    public function get($option, $default = null)
     {
-        return $this->app['config']->get('trucker.' . $option);
-    }
-
-    /**
-     * Set an option to the config file
-     *
-     * @param  string $option
-     * @param  mixed $value
-     *
-     * @return mixed
-     */
-    public function set($option, $value)
-    {
-        return $this->app['config']->set('trucker.' . $option, $value);
-    }
-
-    /**
-     * Determine if a config option contains a specific
-     *
-     * @param  string $option Config value must be an array
-     * @param  mixed $value
-     *
-     * @return bool
-     */
-    public function contains($option, $value)
-    {
-        $option = $this->get($option);
-        return is_array($option) && in_array($value, $option);
+        return $this->app['config']->get('trucker.'.$option, $default);
     }
 }

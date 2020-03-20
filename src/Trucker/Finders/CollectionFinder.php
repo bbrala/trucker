@@ -49,10 +49,11 @@ class CollectionFinder
      * Function to fetch a collection of Trucker\Resource\Model object
      * from the remote API.
      *
-     * @param  Model                      $model       Instance of entity type being fetched
-     * @param  QueryConditionInterface    $condition   Query conditions for the request
-     * @param  QueryResultOrderInterface  $resultOrder Result ordering requirements for the request
-     * @param  array                      $getParams   Additional GET parameters to send w/ request
+     * @param  Model                     $model       Instance of entity type being fetched
+     * @param  QueryConditionInterface   $condition   Query conditions for the request
+     * @param  QueryResultOrderInterface $resultOrder Result ordering requirements for the request
+     * @param  array                     $getParams   Additional GET parameters to send w/ request
+     *
      * @return Trucker\Responses\Collection
      */
     public function fetch(
@@ -101,6 +102,11 @@ class CollectionFinder
 
         //figure out wether a collection key is used
         $collection_key = Config::get('resource.collection_key');
+
+        //if collection key is a CLosure, call the closure
+        if ($collection_key instanceof \Closure) {
+            $collection_key = $collection_key($model);
+        }
 
         //set records array appropriatley
         if (isset($collection_key)) {
